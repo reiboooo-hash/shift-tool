@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>シフト作成ツール（看護師）</title>
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --surface: #ffffff;
+    --primary: #3b6ea5;
+    --primary-light: #e8f0fb;
+    --accent: #5b9bd5;
+    --text: #1e2a38;
+    --text-sub: #6b7a8d;
+    --border: #c8d4e4;
+    --shadow: 0 2px 8px rgba(59,110,165,0.10);
+
+    /* シフト色（実物に合わせた色） */
+    --col-off:     #f4a46a;   /* OFF：オレンジ */
+    --col-off-bg:  #fde8d4;
+    --col-zaitaku: #6dba8a;   /* 在宅：緑 */
+    --col-zaitaku-bg: #d4f0df;
+    --col-yugyu:   #5dade2;   /* 有給：水色 */
+    --col-yugyu-bg:#d6edf9;
+    --col-closed:  #d0d0d0;   /* 休診：グレー */
+    --col-cont:    #e8e8e8;   /* 継続：薄グレー */
+    --col-work:    #ffffff;   /* 通常勤務：白 */
+    --col-gaiko:   #f7c948;   /* 外勤：黄 */
+    --col-gaiko-bg:#fef9e0;
+    --col-shiki:   #a78bd4;   /* 四季休暇：紫 */
+    --col-shiki-bg:#ede0f8;
+
+    /* スタッフカラー */
+    --c-koike:   #3b6ea5;
+    --c-sakai:   #3a9a6e;
+    --c-nagakura:#9b59b6;
+    --c-watanabe:#c0392b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Hiragino Kaku Gothic ProN','Meiryo',sans-serif; background: var(--bg); color: var(--text); font-size: 13px; }
+  h1 { font-size: 19px; font-weight: 700; }
+  h2 { font-size: 14px; font-weight: 700; margin-bottom: 10px; color: var(--primary); }
+
+  .app { display: flex; min-height: 100vh; }
+  .sidebar { width: 290px; min-width: 260px; background: var(--surface); border-right: 1.5px solid var(--border); padding: 22px 16px; display: flex; flex-direction: column; gap: 18px; overflow-y: auto; }
+  .main { flex: 1; padding: 22px 18px; overflow-x: auto; }
+
+  .header { display: flex; align-items: center; gap: 10px; }
+  .header-icon { width: 34px; height: 34px; background: var(--primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .header-icon svg { width: 18px; height: 18px; fill: #fff; }
+
+  .card { background: var(--surface); border-radius: 10px; box-shadow: var(--shadow); padding: 14px; }
+
+  label { display: block; font-size: 11px; color: var(--text-sub); margin-bottom: 2px; }
+  input[type="number"], input[type="text"], select {
+    width: 100%; border: 1.5px solid var(--border); border-radius: 6px; padding: 5px 8px;
+    font-size: 12px; color: var(--text); background: var(--bg); outline: none; transition: border 0.15s;
+  }
+  input:focus, select:focus { border-color: var(--accent); background: #fff; }
+  .form-row { display: flex; gap: 7px; align-items: flex-end; margin-bottom: 7px; }
+  .form-row > div { flex: 1; }
+
+  .btn { padding: 7px 14px; border-radius: 7px; border: none; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: #2d5990; }
+  .btn-secondary { background: var(--primary-light); color: var(--primary); }
+  .btn-secondary:hover { background: #d0dff5; }
+  .btn-sm { padding: 4px 9px; font-size: 11px; }
+  .btn-full { width: 100%; margin-bottom: 6px; }
+
+  .alert { padding: 9px 12px; border-radius: 7px; font-size: 12px; line-height: 1.7; margin-bottom: 8px; }
+  .alert-error { background: #fdeaea; color: #c0392b; border-left: 3px solid #c0392b; }
+  .alert-warn  { background: #fef8e6; color: #d68910; border-left: 3px solid #d68910; }
+  .alert-ok    { background: #d4f0df; color: #1e8449; border-left: 3px solid #1e8449; }
+
+  /* ===== テーブル ===== */
+  .shift-table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; min-width: 900px; }
+  th, td { border: 1px solid var(--border); padding: 0; text-align: center; vertical-align: middle; }
+
+  /* ヘッダー */
+  thead tr.hd1 th { background: var(--primary); color: #fff; padding: 7px 5px; font-size: 13px; font-weight: 700; position: sticky; top: 0; z-index: 10; }
+  thead tr.hd2 th { background: #2d5990; color: #dce8f8; font-size: 11px; font-weight: 500; padding: 4px 5px; position: sticky; top: 34px; z-index: 9; }
+
+  /* 行 */
+  .row-am td { border-bottom: 1px dashed var(--border); }
+  .row-pm td { border-top: none; border-bottom: 2px solid var(--border); }
+  .row-holiday td { background: #f0e0e0 !important; }
+  .row-sat td { background: #eef3fb !important; }
+
+  .date-cell { padding: 0 6px; font-size: 12px; font-weight: 700; white-space: nowrap; min-width: 60px; }
+  .date-cell .dow { font-size: 10px; font-weight: 400; margin-left: 2px; }
+  .dow-sun { color: #c0392b; }
+  .dow-sat { color: var(--primary); }
+
+  .ampm-lbl { font-size: 10px; font-weight: 700; padding: 0 4px; white-space: nowrap; min-width: 28px; }
+  .ampm-lbl.am { color: #d68910; }
+  .ampm-lbl.pm { color: var(--primary); }
+
+  /* シフトセレクト */
+  .ss {
+    border: 1.5px solid var(--border); border-radius: 4px; padding: 2px 2px;
+    font-size: 11px; font-weight: 600; outline: none; cursor: pointer;
+    width: 82px; transition: background 0.12s, border 0.12s;
+    -webkit-appearance: none; appearance: none;
+    text-align: center;
+  }
+  .ss:disabled { opacity: 0.4; cursor: default; }
+  .ss.has-error { border-color: #c0392b !important; }
+
+  /* 値による色 */
+  .ss.v-work    { background: var(--col-work);      color: var(--text);        border-color: var(--border); }
+  .ss.v-off     { background: var(--col-off-bg);    color: #b94a00;            border-color: var(--col-off); font-weight: 700; }
+  .ss.v-zaitaku { background: var(--col-zaitaku-bg);color: #1a6b3a;            border-color: var(--col-zaitaku); font-weight: 700; }
+  .ss.v-yugyu   { background: var(--col-yugyu-bg);  color: #1a5276;            border-color: var(--col-yugyu); font-weight: 700; }
+  .ss.v-gaiko   { background: var(--col-gaiko-bg);  color: #7d6000;            border-color: var(--col-gaiko); font-weight: 700; }
+  .ss.v-shiki   { background: var(--col-shiki-bg);  color: #5b2d8e;            border-color: var(--col-shiki); font-weight: 700; }
+  .ss.v-closed  { background: #ebebeb;              color: #aaa;               border-color: #ccc; }
+  .ss.v-cont    { background: #f4f4f4;              color: #bbb; font-style: italic; font-weight: 400; border-color: #ddd; }
+
+  .shift-cell { padding: 2px 3px; }
+  .note-cell  { padding: 2px 4px; min-width: 90px; }
+  .note-cell input { font-size: 11px; padding: 2px 4px; }
+
+  /* 統計 */
+  .stats-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .stat-box { background: var(--surface); border-radius: 8px; box-shadow: var(--shadow); padding: 9px 14px; min-width: 90px; }
+  .stat-lbl { font-size: 10px; color: var(--text-sub); margin-bottom: 2px; }
+  .stat-val { font-size: 18px; font-weight: 700; }
+  .stat-val.koike    { color: var(--c-koike); }
+  .stat-val.sakai    { color: var(--c-sakai); }
+  .stat-val.nagakura { color: var(--c-nagakura); }
+  .stat-val.watanabe { color: var(--c-watanabe); }
+
+  /* 凡例 */
+  .legend { display: flex; flex-wrap: wrap; gap: 6px; }
+  .leg { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; }
+  .leg-dot { width: 12px; height: 12px; border-radius: 3px; border: 1px solid #ccc; }
+
+  @media print {
+    .sidebar, .btn, .stats-bar, #error-area { display: none !important; }
+    .main { padding: 4px; }
+    table { font-size: 9px; }
+    .ss { border: none; font-size: 9px; width: auto; background: transparent !important; color: #000 !important; }
+    thead tr.hd1 th, thead tr.hd2 th { position: static; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ===== サイドバー ===== -->
+<aside class="sidebar">
+  <div class="header">
+    <div class="header-icon">
+      <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5C3.9 3 3 3.9 3 5v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 18H5V8h14v13z"/></svg>
+    </div>
+    <h1>シフト作成ツール</h1>
+  </div>
+
+  <!-- 対象月 -->
+  <div class="card">
+    <h2>対象月</h2>
+    <div class="form-row">
+      <div><label>年</label><input type="number" id="inp-year" min="2024" max="2030" style="width:72px"></div>
+      <div>
+        <label>月</label>
+        <select id="inp-month" style="width:72px">
+          <option value="1">1月</option><option value="2">2月</option><option value="3">3月</option>
+          <option value="4">4月</option><option value="5">5月</option><option value="6">6月</option>
+          <option value="7">7月</option><option value="8">8月</option><option value="9">9月</option>
+          <option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="generateShift()">生成</button>
+    </div>
+  </div>
+
+  <!-- スタッフ設定 -->
+  <div class="card">
+    <h2>スタッフ設定</h2>
+    <div id="staff-settings"></div>
+  </div>
+
+  <!-- 祝日 -->
+  <div class="card">
+    <h2>祝日設定</h2>
+    <div class="form-row" style="margin-bottom:6px">
+      <input type="text" id="inp-holiday" placeholder="YYYY-MM-DD" style="flex:1">
+      <button class="btn btn-secondary btn-sm" onclick="addHoliday()">追加</button>
+    </div>
+    <div id="holiday-list" style="display:flex;flex-wrap:wrap;gap:4px;font-size:11px;"></div>
+  </div>
+
+  <!-- 夜間診療休止設定 -->
+  <div class="card">
+    <h2>夜間診療休止日</h2>
+    <div style="font-size:11px;color:var(--text-sub);margin-bottom:6px;">月・金のうち夜間なしの日を登録</div>
+    <div class="form-row" style="margin-bottom:6px;">
+      <input type="text" id="inp-yakan" placeholder="YYYY-MM-DD" style="flex:1">
+      <button class="btn btn-secondary btn-sm" onclick="addNoYakan()">追加</button>
+    </div>
+    <div id="yakan-list" style="display:flex;flex-wrap:wrap;gap:4px;font-size:11px;"></div>
+  </div>
+
+  <!-- 操作 -->
+  <div class="card">
+    <h2>操作</h2>
+    <button class="btn btn-secondary btn-full" onclick="checkAll()">🔍 ルールチェック</button>
+    <button class="btn btn-secondary btn-full" onclick="window.print()">🖨️ 印刷</button>
+    <button class="btn btn-secondary btn-full" onclick="exportCSV()">📥 CSV出力</button>
+  </div>
+
+  <!-- 凡例 -->
+  <div class="card">
+    <h2>凡例</h2>
+    <div class="legend">
+      <div class="leg"><div class="leg-dot" style="background:#fff;border-color:#aaa;"></div>時間〜：出勤</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--col-zaitaku-bg);border-color:var(--col-zaitaku);"></div>在宅</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--col-off-bg);border-color:var(--col-off);"></div>OFF</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--col-yugyu-bg);border-color:var(--col-yugyu);"></div>有給</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--col-gaiko-bg);border-color:var(--col-gaiko);"></div>外勤</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--col-shiki-bg);border-color:var(--col-shiki);"></div>四季休暇</div>
+      <div class="leg"><div class="leg-dot" style="background:#ebebeb;border-color:#ccc;"></div>ー（休診）</div>
+      <div class="leg"><div class="leg-dot" style="background:#f4f4f4;border-color:#ddd;"></div>（継続）PM継続</div>
+    </div>
+    <div style="font-size:11px;color:var(--text-sub);margin-top:8px;line-height:1.8;">
+      AM：〜13:00　PM：13:00〜<br>
+      PM欄「（継続）」＝午前からそのまま継続
+    </div>
+  </div>
+</aside>
+
+<!-- ===== メイン ===== -->
+<main class="main">
+  <div id="stats-area"></div>
+  <div id="error-area"></div>
+  <div id="shift-area" style="color:var(--text-sub);margin-top:40px;text-align:center;font-size:15px;">
+    ← 左のパネルで対象月を選択し「生成」を押してください
+  </div>
+</main>
+</div>
+
+<script>
+// ===== 祝日 =====
+const JP_HOLIDAYS = {
+  '2025-01-01':'元日','2025-01-13':'成人の日','2025-02-11':'建国記念の日',
+  '2025-02-23':'天皇誕生日','2025-02-24':'天皇誕生日（振替）','2025-03-20':'春分の日',
+  '2025-04-29':'昭和の日','2025-05-03':'憲法記念日','2025-05-04':'みどりの日',
+  '2025-05-05':'こどもの日','2025-05-06':'こどもの日（振替）','2025-07-21':'海の日',
+  '2025-08-11':'山の日','2025-09-15':'敬老の日','2025-09-23':'秋分の日',
+  '2025-10-13':'スポーツの日','2025-11-03':'文化の日','2025-11-23':'勤労感謝の日',
+  '2025-11-24':'勤労感謝の日（振替）',
+  '2026-01-01':'元日','2026-01-12':'成人の日','2026-02-11':'建国記念の日',
+  '2026-02-23':'天皇誕生日','2026-03-20':'春分の日','2026-04-29':'昭和の日',
+  '2026-05-03':'憲法記念日','2026-05-04':'みどりの日','2026-05-05':'こどもの日',
+  '2026-05-06':'こどもの日（振替）','2026-07-20':'海の日','2026-08-11':'山の日',
+  '2026-09-21':'敬老の日','2026-09-22':'国民の休日','2026-09-23':'秋分の日',
+  '2026-10-12':'スポーツの日','2026-11-03':'文化の日','2026-11-23':'勤労感謝の日',
+};
+
+// ===== スタッフ定義 =====
+const STAFF_DEF = [
+  { id:'koike',    name:'小池',  hours:7, defaultAM:'8:30',  cls:'koike' },
+  { id:'sakai',    name:'坂井',  hours:8, defaultAM:'8:00',  cls:'sakai' },
+  { id:'nagakura', name:'長倉',  hours:8, defaultAM:'8:15',  cls:'nagakura' },
+  { id:'watanabe', name:'渡邊',  hours:8, defaultAM:'9:30',  cls:'watanabe' },
+];
+
+// ===== 選択肢 =====
+const AM_TIMES = ['7:00','7:30','8:00','8:15','8:30','8:45','9:00','9:15','9:30','10:00','10:30','11:00'];
+const PM_TIMES = ['12:00','12:30','13:00','13:30','14:00'];
+const CLOSED   = 'ー';
+const CONT     = '';   // PM継続
+
+const AM_OPTS = [...AM_TIMES, '在宅', 'OFF', '有給', '外勤', '四季休暇', CLOSED];
+const PM_OPTS = [CONT, ...PM_TIMES, '在宅', 'OFF', '有給', '外勤', '四季休暇', '夜間', CLOSED];
+
+// 勤務扱いとなる値（有給・外勤・四季休暇も含む）
+const WORK_VALS = new Set(['在宅','有給','外勤','四季休暇','夜間']);
+const isWorkAM  = v => AM_TIMES.includes(v) || WORK_VALS.has(v);
+const isWorkPM  = (pm, am) => PM_TIMES.includes(pm) || WORK_VALS.has(pm) || (pm === CONT && isWorkAM(am));
+const isPMLate  = (pm, am) => PM_TIMES.includes(pm) || pm === '在宅' || pm === '外勤' || (pm === CONT && isWorkAM(am));
+const isWorkDay = r => isWorkAM(r.am) || PM_TIMES.includes(r.pm) || WORK_VALS.has(r.pm);
+
+// ===== 状態 =====
+let holidays = [];
+let noYakan = []; // 夜間診療休止日（月・金のみ対象）
+let shiftData = {};
+let currentYear, currentMonth;
+
+// ===== 初期化 =====
+(function(){
+  const now = new Date();
+  // デフォルトを10月に設定（依頼通り）
+  document.getElementById('inp-year').value  = now.getFullYear() >= 2026 ? now.getFullYear() : 2026;
+  document.getElementById('inp-month').value = 10;
+  renderStaffSettings();
+})();
+
+// ===== スタッフ設定UI =====
+function calcWatanabe() {
+  const ids = ['koike','sakai','nagakura'];
+  const vals = ids.map(id => parseInt(document.getElementById('days-'+id)?.value)||0);
+  const avg  = vals.reduce((a,b)=>a+b,0) / vals.length;
+  return Math.round(avg * 4 / 5);
+}
+
+function updateWatanabe() {
+  const el = document.getElementById('days-watanabe');
+  if (!el) return;
+  const auto = calcWatanabe();
+  el.value = auto;
+  const hint = document.getElementById('watanabe-hint');
+  if (hint) hint.textContent = '（自動: ' + auto + '日）';
+  renderStats();
+}
+
+function renderStaffSettings() {
+  const colors = { koike:'var(--c-koike)', sakai:'var(--c-sakai)', nagakura:'var(--c-nagakura)', watanabe:'var(--c-watanabe)' };
+  const rows = STAFF_DEF.map(s => {
+    const isW = s.id === 'watanabe';
+    const inputExtra = isW ? 'id="days-watanabe" style="width:52px;text-align:center;background:#fef8e6;border-color:#e0a030;"'
+                           : `id="days-${s.id}" style="width:52px;text-align:center;" oninput="updateWatanabe()"`;
+    const hint = isW ? '<span id="watanabe-hint" style="font-size:10px;color:var(--text-sub);margin-left:4px;"></span>' : '';
+    return `
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:7px 9px;background:var(--bg);border-radius:7px;">
+      <span style="font-weight:700;color:${colors[s.id]};width:32px;font-size:13px;">${s.name}</span>
+      <div style="flex:1">
+        <label>月間勤務日数${isW?' <span style="font-size:9px;color:#d68910;">他3名の4/5・四捨五入</span>':''}</label>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <input type="number" ${inputExtra} value="20" min="1" max="31">
+          ${hint}
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--text-sub);line-height:1.6;">${s.hours}h勤務<br>基本${s.defaultAM}〜</div>
+    </div>`;
+  }).join('');
+  document.getElementById('staff-settings').innerHTML = rows;
+  // 初期計算
+  updateWatanabe();
+}
+
+// ===== 祝日 =====
+function addHoliday() {
+  const v = document.getElementById('inp-holiday').value.trim();
+  if (!v.match(/^\d{4}-\d{2}-\d{2}$/)) { alert('YYYY-MM-DD形式で入力してください'); return; }
+  if (!holidays.includes(v)) holidays.push(v);
+  document.getElementById('inp-holiday').value = '';
+  renderHolidayList();
+}
+function removeHoliday(d) { holidays = holidays.filter(h => h !== d); renderHolidayList(); }
+function renderHolidayList() {
+  document.getElementById('holiday-list').innerHTML = [...holidays].sort().map(h => {
+    const [,m,d] = h.split('-').map(Number);
+    return `<span style="background:#fdeaea;color:#c0392b;border-radius:4px;padding:2px 6px;display:inline-flex;align-items:center;gap:3px;">
+      ${m}/${d} ${JP_HOLIDAYS[h]||'手動追加'}
+      <span onclick="removeHoliday('${h}')" style="cursor:pointer;font-weight:700;">×</span>
+    </span>`;
+  }).join('');
+}
+
+// ===== 夜間診療休止 =====
+function addNoYakan() {
+  const v = document.getElementById('inp-yakan').value.trim();
+  if (!v.match(/^\d{4}-\d{2}-\d{2}$/)) { alert('YYYY-MM-DD形式で入力してください'); return; }
+  const dow = new Date(v).getDay();
+  if (dow !== 1 && dow !== 5) { alert('月曜日か金曜日を指定してください'); return; }
+  if (!noYakan.includes(v)) noYakan.push(v);
+  document.getElementById('inp-yakan').value = '';
+  renderYakanList();
+}
+function removeNoYakan(d) { noYakan = noYakan.filter(h => h !== d); renderYakanList(); }
+function renderYakanList() {
+  const DOW = ['日','月','火','水','木','金','土'];
+  document.getElementById('yakan-list').innerHTML = [...noYakan].sort().map(h => {
+    const [,m,d] = h.split('-').map(Number);
+    const dow = new Date(h).getDay();
+    return `<span style="background:#fef9e0;color:#7d6000;border-radius:4px;padding:2px 6px;display:inline-flex;align-items:center;gap:3px;">
+      ${m}/${d}(${DOW[dow]}) 夜間休止
+      <span onclick="removeNoYakan('${h}')" style="cursor:pointer;font-weight:700;">×</span>
+    </span>`;
+  }).join('');
+}
+
+// ===== 生成 =====
+function generateShift() {
+  currentYear  = parseInt(document.getElementById('inp-year').value);
+  currentMonth = parseInt(document.getElementById('inp-month').value);
+  if (!currentYear || !currentMonth) return;
+
+  const days = daysInMonth(currentYear, currentMonth);
+  // 祝日自動セット
+  for (let d = 1; d <= days; d++) {
+    const k = dk(d);
+    if (JP_HOLIDAYS[k] && !holidays.includes(k)) holidays.push(k);
+  }
+  renderHolidayList();
+
+  // 平日日数（土日祝を除く）を自動計算して勤務日数にセット
+  let weekdays = 0;
+  for (let d = 1; d <= days; d++) {
+    const k = dk(d);
+    const dow = new Date(currentYear, currentMonth-1, d).getDay();
+    if (dow !== 0 && dow !== 6 && !holidays.includes(k)) weekdays++;
+  }
+  ['koike','sakai','nagakura'].forEach(id => {
+    document.getElementById('days-'+id).value = weekdays;
+  });
+  updateWatanabe();
+
+  // 初期シフト生成（既存データ保持）
+  for (let d = 1; d <= days; d++) {
+    const k = dk(d);
+    if (shiftData[k]) continue;
+    const dow = new Date(currentYear, currentMonth-1, d).getDay();
+    const isClosed = dow === 0 || holidays.includes(k);
+    const defAM = isClosed ? CLOSED : null; // nullは後でスタッフごとに設定
+    const defPM = isClosed ? CLOSED : CONT;
+    const rec = { note: '' };
+    STAFF_DEF.forEach(s => {
+      rec[s.id] = { am: isClosed ? CLOSED : s.defaultAM, pm: defPM };
+    });
+    shiftData[k] = rec;
+  }
+  renderTable();
+  renderStats();
+}
+
+// ===== 色クラス =====
+function vc(v, half) {
+  if (v === CLOSED)  return 'v-closed';
+  if (v === 'OFF')   return 'v-off';
+  if (v === '在宅')  return 'v-zaitaku';
+  if (v === '有給')  return 'v-yugyu';
+  if (v === '外勤')  return 'v-gaiko';
+  if (v === '四季休暇') return 'v-shiki';
+  if (half === 'pm' && v === CONT) return 'v-cont';
+  return 'v-work';
+}
+
+// ===== セレクト生成 =====
+function mkSel(key, sid, half, val, disabled) {
+  const opts = half === 'am' ? AM_OPTS : PM_OPTS;
+  const options = opts.map(o =>
+    `<option value="${o}"${val===o?' selected':''}>${half==='pm'&&o===CONT?'（継続）':o}</option>`
+  ).join('');
+  return `<select class="ss ${vc(val,half)}" data-key="${key}" data-sid="${sid}" data-half="${half}"
+    onchange="onSel(this)"${disabled?' disabled':''}>${options}</select>`;
+}
+
+// ===== テーブル描画 =====
+function renderTable() {
+  const days = daysInMonth(currentYear, currentMonth);
+  const DOW  = ['日','月','火','水','木','金','土'];
+  let rows = '';
+
+  for (let d = 1; d <= days; d++) {
+    const key  = dk(d);
+    const dow  = new Date(currentYear, currentMonth-1, d).getDay();
+    const isHol    = holidays.includes(key);
+    const isClosed = dow === 0 || isHol;
+    const isSat    = dow === 6;
+    const dowLbl   = isHol ? '祝' : DOW[dow];
+    const dowCls   = (dow===0||isHol) ? 'dow-sun' : dow===6 ? 'dow-sat' : '';
+    const rowBg    = isClosed ? 'row-holiday' : isSat ? 'row-sat' : '';
+
+    const rec = shiftData[key] || {};
+
+    const amCells = STAFF_DEF.map(s =>
+      `<td class="shift-cell">${mkSel(key, s.id, 'am', rec[s.id]?.am ?? CLOSED, false)}</td>`
+    ).join('');
+    const pmCells = STAFF_DEF.map(s =>
+      `<td class="shift-cell">${mkSel(key, s.id, 'pm', rec[s.id]?.pm ?? CLOSED, false)}</td>`
+    ).join('');
+
+    rows += `
+    <tr class="${rowBg} row-am">
+      <td class="date-cell" rowspan="2" style="border-right:2px solid var(--border);">
+        ${currentMonth}/${d}<br><span class="dow ${dowCls}">(${dowLbl})</span>
+      </td>
+      <td class="ampm-lbl am" rowspan="1">AM</td>
+      ${amCells}
+      <td class="note-cell" rowspan="2">
+        <input type="text" value="${rec.note||''}" data-key="${key}" onchange="onNote(this)" placeholder="備考">
+      </td>
+    </tr>
+    <tr class="${rowBg} row-pm">
+      <td class="ampm-lbl pm">PM</td>
+      ${pmCells}
+    </tr>`;
+  }
+
+  // ヘッダー
+  const hd1 = STAFF_DEF.map(s =>
+    `<th style="min-width:90px;">${s.name}</th>`).join('');
+  const hd2 = STAFF_DEF.map(s =>
+    `<th style="font-size:10px;">${s.hours}h勤務</th>`).join('');
+
+  document.getElementById('shift-area').innerHTML = `
+    <div class="shift-table-wrap"><table>
+      <thead>
+        <tr class="hd1">
+          <th rowspan="2" style="width:66px;">日付</th>
+          <th rowspan="2" style="width:32px;"></th>
+          ${hd1}
+          <th rowspan="2" style="min-width:90px;">備考</th>
+        </tr>
+        <tr class="hd2">${hd2}</tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+// ===== イベント =====
+function onSel(el) {
+  const {key, sid, half} = el.dataset;
+  shiftData[key][sid][half] = el.value;
+  el.className = `ss ${vc(el.value, half)}`;
+  renderStats();
+  highlightErr(key);
+}
+function onNote(el) { shiftData[el.dataset.key].note = el.value; }
+
+// ===== ルールチェック =====
+function checkDay(key) {
+  const [y,m,d] = key.split('-').map(Number);
+  const dow = new Date(y,m-1,d).getDay();
+  if (dow===0 || holidays.includes(key)) return [];
+  const isSat = dow===6;
+  const rec   = shiftData[key];
+  if (!rec) return [];
+  const errs = [];
+
+  const amCount = STAFF_DEF.filter(s => isWorkAM(rec[s.id]?.am)).length;
+  const pmCount = STAFF_DEF.filter(s => isWorkPM(rec[s.id]?.pm, rec[s.id]?.am)).length;
+  // 小池さんは16:30まで → PM遅番（16:30〜）はkoike以外で判定
+  const pmLate  = STAFF_DEF.filter(s => s.id!=='koike' && isPMLate(rec[s.id]?.pm, rec[s.id]?.am)).length;
+
+  if (isSat) {
+    if (amCount < 2) errs.push('土曜午前：2名以上必要');
+  } else {
+    if (amCount < 2) errs.push('午前：2名以上必要');
+    if (pmCount < 1) errs.push('午後：1名以上必要');
+    if (pmLate  < 1) errs.push('16:30以降：小池以外が必要');
+    // 月・金の夜間チェック（休止日を除く）
+    if ((dow===1 || dow===5) && !noYakan.includes(key)) {
+      const yakanCount = STAFF_DEF.filter(s => rec[s.id]?.pm === '夜間').length;
+      if (yakanCount < 1) errs.push('夜間担当が必要');
+    }
+  }
+  return errs;
+}
+
+function highlightErr(key) {
+  const errs = checkDay(key);
+  document.querySelectorAll(`.ss[data-key="${key}"]`).forEach(el => {
+    el.classList.toggle('has-error', errs.length > 0);
+  });
+}
+
+function checkAll() {
+  const errMap = {};
+  Object.keys(shiftData).forEach(k => { const e=checkDay(k); if(e.length) errMap[k]=e; });
+
+  const warns = [];
+  STAFF_DEF.forEach(s => {
+    const target = parseInt(document.getElementById('days-'+s.id).value)||0;
+    const worked = countWork(s.id);
+    if (worked !== target) warns.push(`${s.name}：目標${target}日 / 現在${worked}日`);
+  });
+
+  const remoteW = checkRemote();
+
+  let html = '';
+  if (!Object.keys(errMap).length && !warns.length && !remoteW.length) {
+    html = '<div class="alert alert-ok">✅ ルール違反なし</div>';
+  } else {
+    if (Object.keys(errMap).length)
+      html += '<div class="alert alert-error"><b>ルール違反：</b><br>'+
+        Object.entries(errMap).sort().map(([k,e])=>{const[,m,d]=k.split('-').map(Number);return`${m}/${d}：${e.join('、')}`;}).join('<br>')+'</div>';
+    if (warns.length)
+      html += '<div class="alert alert-warn"><b>勤務日数不一致：</b><br>'+warns.join('<br>')+'</div>';
+    if (remoteW.length)
+      html += '<div class="alert alert-warn"><b>在宅勤務：</b><br>'+remoteW.join('<br>')+'</div>';
+  }
+
+  document.querySelectorAll('select.ss').forEach(el => {
+    el.classList.toggle('has-error', !!errMap[el.dataset.key]);
+  });
+  document.getElementById('error-area').innerHTML = html;
+}
+
+function countWork(sid) {
+  let total = 0;
+  Object.entries(shiftData).forEach(([key, r]) => {
+    if (!r[sid]) return;
+    const [y,m,d] = key.split('-').map(Number);
+    const dow = new Date(y,m-1,d).getDay();
+    const am = r[sid].am;
+    const pm = r[sid].pm;
+
+    const amWork = isWorkAM(am);
+    // PM継続はAMが出勤のとき「フル勤務の後半」なので独立カウントしない
+    const pmOnlyWork = PM_TIMES.includes(pm) || WORK_VALS.has(pm); // 継続を除く実出勤
+
+    if (amWork && pmOnlyWork) {
+      total += 1;       // フル（AM出勤 + PM別途入力）
+    } else if (amWork && pm === CONT) {
+      total += 1;       // フル（AM出勤 + PM継続）
+    } else if (amWork) {
+      total += 0.5;     // AM半日のみ
+    } else if (pmOnlyWork) {
+      total += 0.5;     // PM半日のみ（遅出）
+    }
+  });
+  return total;
+}
+
+function checkRemote() {
+  const warns = [];
+  const weeks = getWeeks();
+  STAFF_DEF.forEach(s => {
+    weeks.forEach((wk,i) => {
+      const hasWork   = wk.some(k => shiftData[k]?.[s.id] && isWorkDay(shiftData[k][s.id]));
+      const hasRemote = wk.some(k => shiftData[k]?.[s.id] && (shiftData[k][s.id].am==='在宅'||shiftData[k][s.id].pm==='在宅'));
+      if (hasWork && !hasRemote) warns.push(`${s.name}：第${i+1}週に在宅なし`);
+    });
+  });
+  return warns;
+}
+
+function getWeeks() {
+  const days = daysInMonth(currentYear, currentMonth);
+  const weeks=[]; let wk=[];
+  for(let d=1;d<=days;d++){
+    const k=dk(d);
+    if(new Date(currentYear,currentMonth-1,d).getDay()===1&&wk.length){weeks.push(wk);wk=[];}
+    wk.push(k);
+  }
+  if(wk.length) weeks.push(wk);
+  return weeks;
+}
+
+// ===== 統計 =====
+function countOff(sid) {
+  return Object.values(shiftData).filter(r => {
+    if (!r[sid]) return false;
+    const dow = (() => {
+      // 休診日（土日祝）はカウントしない
+      const keys = Object.keys(shiftData);
+      // find key for this record
+      return null;
+    })();
+    return r[sid].am === 'OFF' || r[sid].pm === 'OFF';
+  }).length;
+}
+
+function countOffDays(sid) {
+  // AM・PMそれぞれOFFなら0.5日ずつカウント
+  let total = 0;
+  Object.entries(shiftData).forEach(([key, r]) => {
+    if (!r[sid]) return;
+    const [y,m,d] = key.split('-').map(Number);
+    const dow = new Date(y,m-1,d).getDay();
+    if (dow===0 || holidays.includes(key)) return; // 休診日は除外
+    if (r[sid].am === 'OFF') total += 0.5;
+    if (r[sid].pm === 'OFF') total += 0.5;
+  });
+  return total;
+}
+
+function renderStats() {
+  if (!currentYear) return;
+  document.getElementById('stats-area').innerHTML = '<div class="stats-bar">' +
+    STAFF_DEF.map(s => {
+      const worked = countWork(s.id);
+      const target = parseInt(document.getElementById('days-'+s.id).value)||0;
+      const offDays = countOffDays(s.id);
+      const workColor = worked > target ? '#c0392b' : worked < target ? '#d68910' : 'var(--c-'+s.cls+')';
+      return `<div class="stat-box" style="min-width:110px;">
+        <div class="stat-lbl" style="font-weight:700;color:var(--c-${s.cls});margin-bottom:6px;">${s.name}</div>
+        <div style="display:flex;gap:12px;align-items:flex-end;">
+          <div>
+            <div class="stat-lbl">出勤日数</div>
+            <div class="stat-val" style="color:${workColor};font-size:20px;">${worked}<span style="font-size:11px;color:var(--text-sub)">/${target}</span></div>
+          </div>
+          <div>
+            <div class="stat-lbl">OFF</div>
+            <div class="stat-val" style="color:#b94a00;font-size:20px;">${offDays}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('') + '</div>';
+}
+
+// ===== CSV =====
+function exportCSV() {
+  if (!currentYear) return;
+  const days = daysInMonth(currentYear, currentMonth);
+  const DOW  = ['日','月','火','水','木','金','土'];
+  const cols = STAFF_DEF.map(s=>`${s.name}_AM,${s.name}_PM`).join(',');
+  let csv = `日付,曜日,${cols},備考\n`;
+  for (let d=1;d<=days;d++) {
+    const key = dk(d);
+    const dt  = new Date(currentYear, currentMonth-1, d);
+    const rec = shiftData[key]||{};
+    const vals = STAFF_DEF.map(s=>`${rec[s.id]?.am??CLOSED},${rec[s.id]?.pm===CONT?'継続':rec[s.id]?.pm??CLOSED}`).join(',');
+    csv += `${currentMonth}/${d},${DOW[dt.getDay()]},${vals},"${rec.note||''}"\n`;
+  }
+  const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `shift_${currentYear}${String(currentMonth).padStart(2,'0')}.csv`;
+  a.click();
+}
+
+// ===== ユーティリティ =====
+function daysInMonth(y,m){ return new Date(y,m,0).getDate(); }
+function dk(d){ return `${currentYear}-${String(currentMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+</script>
+</body>
+</html>
